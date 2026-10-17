@@ -1,6 +1,9 @@
 import pytest
 from unittest.mock import MagicMock
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
+
+from app.core.graph import build_graph
+from langchain_core.tools import tool
 
 # We need to mock the LLM *before* importing the graph
 with MagicMock() as mock_llm:
@@ -8,9 +11,6 @@ with MagicMock() as mock_llm:
         # Mock the app.services.llm.llm variable
         mp.setattr("app.services.llm.llm", mock_llm)
         mp.setattr("app.services.llm.llm.bind_tools", return_value=mock_llm)
-        
-        from app.core.graph import sre_agent_app
-        from langchain_core.messages import ToolMessage
 
 def test_graph_routes_to_tools(monkeypatch):
     """Test if the graph routes to the tool node when the LLM returns a tool call."""
@@ -44,3 +44,13 @@ def test_graph_routes_to_tools(monkeypatch):
     assert len(messages) >= 3
     # Check if the ToolMessage exists (meaning tool_node executed)
     assert any(isinstance(msg, ToolMessage) for msg in messages)
+
+@tool
+def mock_tool_for_test():
+    """A dummy tool for testing graph compilation."""
+    return "dummy result"
+
+def test_graph_compilation():
+    """Verify that the LangGraph state machine compiles successfully with injected tools."""
+    graph = build_graph([mock_tool_for_test])
+    assert graph is not None

@@ -110,8 +110,14 @@ if prompt := st.chat_input("e.g., payment-service-oom keeps restarting, please c
             st.warning("⚠️ **High-Risk Operation Intercepted**: Agent requests to restart Pod `payment-service-error`.")
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("✅ Approve Execution", type="primary", use_container_width=True):
-                    st.success("Execution command sent! (In production, this calls the /api/v1/chat/approve endpoint)")
+                approve_url = "http://127.0.0.1:8000/api/v1/chat/approve"
+                resp = requests.post(approve_url, json={
+                    "session_id": st.session_state.session_id,
+                    "tool_call_id": "dummy",
+                    "approved": True
+                })
+                st.success(resp.json()["message"])
+                st.rerun()
             with col2:
                 if st.button("❌ Reject", use_container_width=True):
                     st.info("Operation cancelled.")
