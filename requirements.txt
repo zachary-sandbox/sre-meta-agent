@@ -1,41 +1,43 @@
 # ==========================================
 # Production Dependencies
 # ==========================================
-fastapi>=0.115.0
-uvicorn>=0.32.0
-pydantic>=2.10.0
+fastapi>=0.142.2
+uvicorn>=0.54.0
+pydantic>=2.13.4
 sse-starlette>=2.0.0
 python-dotenv>=1.0.0
 
 # ==========================================
 # Frontend / UI
 # ==========================================
-streamlit>=1.35.0
+streamlit>=1.65.0
 
 # ==========================================
 # LangChain & LangGraph Ecosystem
 # ==========================================
-langgraph>=0.4.0
-langgraph-checkpoint>=2.0.0
-langchain-core>=0.3.0
+langchain>=1.4.4
+langchain-core>=1.6.9
+langgraph>=1.2.12
 
 # ==========================================
 # LLM Providers (Factory Pattern)
 # ==========================================
-langchain-openai>=0.3.0
-langchain-anthropic>=0.2.0
-langchain-deepseek>=0.1.0
-langchain-ollama>=0.2.0
+langchain-openai>=1.7.2
+langchain-anthropic>=1.7.4
+langchain-deepseek>=1.1.1
+langchain-ollama>=1.1.0
 
 # ==========================================
-# Infrastructure & Tools
+# MCP & Infrastructure Tools
 # ==========================================
-kubernetes>=29.0.0
+mcp[cli]>=2.3.0
+langchain[mcp]>=1.4.4
+kubernetes>=36.0.3
 
 # ==========================================
 # Testing Dependencies
 # ==========================================
-pytest>=7.4.0
-pytest-asyncio>=0.21.1
-pytest-mock>=3.12.0
-httpx>=0.25.0
+pytest>=8.0.0
+pytest-asyncio>=0.24.0
+pytest-mock>=3.14.0
+httpx>=0.27.0
