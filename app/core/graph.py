@@ -58,7 +58,7 @@ def build_graph():
     # This means the graph will PAUSE before executing any tool
     return workflow.compile(
         checkpointer=memory,
-        interrupt_before=["tools"] # <--- Add this
+        # interrupt_before=["tools"] # <--- Add this
     )
 
 sre_agent_app = build_graph()

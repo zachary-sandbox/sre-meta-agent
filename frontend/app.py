@@ -10,6 +10,7 @@ st.set_page_config(page_title="SRE Meta Agent", page_icon="🤖", layout="wide")
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "session_id" not in st.session_state:
+    # Generates a unique ID every time the page is refreshed
     st.session_state.session_id = str(uuid.uuid4())
 if "tool_status" not in st.session_state:
     st.session_state.tool_status = ""
@@ -55,44 +56,53 @@ if prompt := st.chat_input("e.g., payment-service-oom keeps restarting, please c
         message_placeholder = st.empty()
         full_response = ""
         
-        # Send request to FastAPI SSE endpoint
         url = "http://127.0.0.1:8000/api/v1/chat/stream"
         payload = {"message": prompt, "session_id": st.session_state.session_id}
         
         try:
-            # Initiate streaming request using requests
-            with requests.post(url, json=payload, stream=True) as response:
+            # Add a timeout to prevent infinite hanging
+            with requests.post(url, json=payload, stream=True, timeout=60) as response:
                 for line in response.iter_lines():
                     if line:
                         decoded_line = line.decode('utf-8')
                         if decoded_line.startswith("data: "):
-                            data_str = decoded_line[6:] # Remove "data: "
+                            data_str = decoded_line[6:] 
                             if data_str == "[DONE]":
                                 break
                             try:
                                 data = json.loads(data_str)
-                                # Handle Tool Execution Status
+                                
+                                # Handle Status Updates
                                 if data["type"] == "status":
                                     st.session_state.tool_status = data["content"]
                                     status_placeholder.info(data["content"])
-                                # Handle LLM Token Stream
+                                    # Show status in chat but don't overwrite previous tokens
+                                    message_placeholder.markdown(f"*{data['content']}*")
+                                
+                                # Handle LLM Tokens
                                 elif data["type"] == "token":
                                     full_response += data["content"]
                                     message_placeholder.markdown(full_response + "▌")
+                                
+                                # Handle Backend Errors
+                                elif data["type"] == "error":
+                                    st.error(f"Backend Error: {data['content']}")
+                                    message_placeholder.empty()
+                                    break
+                                    
                             except json.JSONDecodeError:
                                 pass
             
-            # Streaming finished, remove cursor
-            message_placeholder.markdown(full_response)
+            # Streaming finished successfully
+            if full_response:
+                message_placeholder.markdown(full_response)
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
+            
             st.session_state.tool_status = ""
             status_placeholder.success("Analysis Complete")
             
-            # Save to history
-            st.session_state.messages.append({"role": "assistant", "content": full_response})
-            
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
             st.error(f"Failed to connect to backend: {e}")
-
     # 3. HITL (Human-in-the-Loop) Approval Simulation
     # If the Agent suggests a restart, dynamically render an approval card
     if "restart" in full_response.lower():

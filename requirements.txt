@@ -7,16 +7,30 @@ pydantic>=2.10.0
 sse-starlette>=2.0.0
 python-dotenv>=1.0.0
 
+# ==========================================
+# Frontend / UI
+# ==========================================
+streamlit>=1.35.0
+
+# ==========================================
 # LangChain & LangGraph Ecosystem
+# ==========================================
 langgraph>=0.4.0
 langgraph-checkpoint>=2.0.0
 langchain-core>=0.3.0
 
+# ==========================================
 # LLM Providers (Factory Pattern)
+# ==========================================
 langchain-openai>=0.3.0
 langchain-anthropic>=0.2.0
 langchain-deepseek>=0.1.0
 langchain-ollama>=0.2.0
+
+# ==========================================
+# Infrastructure & Tools
+# ==========================================
+kubernetes>=29.0.0
 
 # ==========================================
 # Testing Dependencies
