@@ -24,6 +24,6 @@ if response_with_tools.tool_calls:
     print(f"Tool Name: {response_with_tools.tool_calls[0]['name']}")
     print(f"Arguments: {response_with_tools.tool_calls[0]['args']}")
 else:
-    print("❌ WARNING: The model did not trigger a tool call.")
+    print("[ERROR] WARNING: The model did not trigger a tool call.")
     print(f"Raw response: {response_with_tools.content}")
     print("💡 Tip: Try a larger model like 'llama3.1' or 'qwen2.5:7b' if this fails.")

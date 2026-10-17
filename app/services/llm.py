@@ -37,7 +37,7 @@ def get_llm(provider: str = None, model_name: str = None, **kwargs):
         return ChatOllama(model=model_name, **kwargs)
         
     else:
-        raise ValueError(f"❌ Unsupported LLM Provider: {provider}. "
+        raise ValueError(f"[ERROR] Unsupported LLM Provider: {provider}. "
                          f"Please choose from ['openai', 'anthropic', 'deepseek', 'ollama']")
 
 # Module-level initialization

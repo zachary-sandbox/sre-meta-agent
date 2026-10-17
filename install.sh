@@ -5,7 +5,7 @@ PROJECT_NAME="sre-meta-agent"
 echo "🚀 Initializing Enterprise-Grade AI Agent Platform (Factory Pattern): $PROJECT_NAME..."
 
 if [ -d "$PROJECT_NAME" ]; then
-    echo "❌ Error: Directory $PROJECT_NAME already exists. Please remove or rename it."
+    echo "[ERROR] Error: Directory $PROJECT_NAME already exists. Please remove or rename it."
     exit 1
 fi
 
@@ -158,7 +158,7 @@ def get_llm(provider: str = None, model_name: str = None, **kwargs):
     elif provider == "ollama":
         return ChatOllama(model=model_name, **kwargs)
     else:
-        raise ValueError(f"❌ Unsupported LLM Provider: {provider}")
+        raise ValueError(f"[ERROR] Unsupported LLM Provider: {provider}")
 
 llm = get_llm()
 EOF
