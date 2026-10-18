@@ -7,6 +7,11 @@ on:
     branches: [ "main", "release/*", "deploy/*" ]
   workflow_dispatch:
 
+# [NEW] Concurrency control to cancel redundant/duplicate runs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
@@ -30,54 +35,60 @@ jobs:
       run: |
         python -m pytest tests/ -v
       env:
-        # ==========================================
-        # 1. Secrets (Sensitive Data) - All Providers
-        # ==========================================
-        # Provide all keys. If a secret is missing, fallback to a dummy key to prevent init crashes.
+        # 1. Secrets (Sensitive Data)
         ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || 'sk-ant-dummy' }}
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'sk-dummy' }}
         DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY || 'sk-dummy' }}
         
-        # ==========================================
-        # 2. Dynamic Variables (Non-sensitive Config)
-        # ==========================================
-        # Default to anthropic, but can be changed in GitHub Repository Variables
+        # 2. Variables (Non-sensitive Configuration)
         LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'anthropic' }}
         LLM_MODEL_NAME: ${{ vars.LLM_MODEL_NAME || 'claude-3-haiku-20240307' }}
         LLM_TEMPERATURE: ${{ vars.LLM_TEMPERATURE || '0' }}
-        
-        # Optional custom endpoints (useful for proxies)
         ANTHROPIC_API_BASE: ${{ vars.ANTHROPIC_API_BASE || '' }}
         OPENAI_API_BASE: ${{ vars.OPENAI_API_BASE || '' }}
         DEEPSEEK_API_BASE: ${{ vars.DEEPSEEK_API_BASE || 'https://api.deepseek.com' }}
         OLLAMA_BASE_URL: ${{ vars.OLLAMA_BASE_URL || 'http://localhost:11434' }}
         
-        # ==========================================
         # 3. Static CI Configurations
-        # ==========================================
         LANGCHAIN_TRACING_V2: "false"
         BACKEND_API_URL: "http://127.0.0.1:8000"
-        KUBECONFIG_PATH: "/tmp/dummy-kubeconfig" # Dummy path for CI tests
+        KUBECONFIG_PATH: "/tmp/dummy-kubeconfig"
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    - name: Build Backend Docker Image
+    # Log in to Docker Hub
+    # Only runs on push events to prevent PRs from failing due to missing secrets
+    - name: Log in to Docker Hub
+      if: github.event_name == 'push'
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    # Build and Push Backend Image
+    - name: Build and Push Backend Docker Image
       uses: docker/build-push-action@v5
       with:
         context: .
         file: ./deploy/Dockerfile.backend
-        push: false
-        tags: sre-meta-agent-backend:ci-test
+        # Only push if the event is a push. PRs will only build.
+        push: ${{ github.event_name == 'push' }}
+        tags: |
+          ${{ secrets.DOCKERHUB_USERNAME }}/sre-meta-agent-backend:latest
+          ${{ secrets.DOCKERHUB_USERNAME }}/sre-meta-agent-backend:${{ github.sha }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
-    - name: Build Frontend Docker Image
+    # Build and Push Frontend Image
+    - name: Build and Push Frontend Docker Image
       uses: docker/build-push-action@v5
       with:
         context: .
         file: ./deploy/Dockerfile.frontend
-        push: false
-        tags: sre-meta-agent-frontend:ci-test
+        push: ${{ github.event_name == 'push' }}
+        tags: |
+          ${{ secrets.DOCKERHUB_USERNAME }}/sre-meta-agent-frontend:latest
+          ${{ secrets.DOCKERHUB_USERNAME }}/sre-meta-agent-frontend:${{ github.sha }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
