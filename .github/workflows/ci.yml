@@ -2,9 +2,10 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ "main", "release", "develop" ]
+    branches: [ "main", "release/*", "deploy/*" ]
   pull_request:
-    branches: [ "main", "release", "develop" ]
+    branches: [ "main", "release/*", "deploy/*" ]
+  workflow_dispatch:
 
 jobs:
   test-and-build:
