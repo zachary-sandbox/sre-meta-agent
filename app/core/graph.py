@@ -1,4 +1,4 @@
-# app/core/graph.py
+import traceback
 from langgraph.types import interrupt, Command
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
@@ -14,9 +14,14 @@ from app.services.llm import llm
 async def planner_node(state: AgentState, llm_with_tools):
     messages = state["messages"]
     system_msg = SystemMessage(content=SRE_SYSTEM_PROMPT)
-    # Asynchronously invoke the LLM with the bound tools
-    response = await llm_with_tools.ainvoke([system_msg] + list(messages))
-    return {"messages": [response]}
+    try:
+        # Asynchronously invoke the LLM with the bound tools
+        response = await llm_with_tools.ainvoke([system_msg] + list(messages))
+        return {"messages": [response]}
+    except Exception as e:
+        print(f"[ERROR] LLM Invoke Failed: {str(e)}")
+        traceback.print_exc() # 打印完整报错堆栈
+        raise e
 
 async def approval_node(state: AgentState):
     """Pauses the graph for high-risk operations (HITL)."""

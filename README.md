@@ -1,27 +1,29 @@
-# SRE Meta Agent (Enterprise MVP) 🚀
+# SRE Meta Agent (Enterprise Platform)
 
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-teal.svg)](https://fastapi.tiangolo.com/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-0.4%2B-orange.svg)](https://python.langchain.com/docs/langgraph)
+[![MCP](https://img.shields.io/badge/MCP-v2.0-purple.svg)](https://modelcontextprotocol.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-An **Enterprise-grade AI Agent Platform** designed for R&D efficiency and SRE (Site Reliability Engineering) troubleshooting. Powered by Large Language Models (LLMs) and tailored for Kubernetes operations, this project implements an Agent Runtime with **stateful memory, SSE streaming, event-driven triggers, and tool calling**.
+An **Enterprise-grade AI Agent Platform** designed for R&D efficiency and SRE (Site Reliability Engineering) troubleshooting. Powered by Large Language Models (LLMs) and tailored for Kubernetes operations, this project implements a secure Agent Runtime with **stateful memory, SSE streaming, MCP tool execution, and Human-in-the-Loop (HITL) safety boundaries**.
 
-## ✨ Core Features
+## Core Features
 
 - **LangGraph-based Orchestration**: Utilizes `StateGraph` to manage multi-turn conversation states and conditional routing, ensuring a deterministic control flow rather than black-box generation.
-- **Real-time Streaming (SSE)**: Integrates Server-Sent Events to stream LLM thought processes and tool execution statuses directly to the frontend, eliminating the "waiting in the dark" UX during complex troubleshooting.
-- **Event-Driven AIOps (Webhook)**: Exposes a dedicated endpoint to ingest Prometheus Alertmanager webhooks, allowing the Agent to autonomously perform first-round triage without human intervention.
-- **Standardized Tool Calling**: Encapsulates internal system capabilities (e.g., K8s log retrieval) as standard tools, enabling LLM-driven automated troubleshooting.
-- **Context & State Management**: Integrates `MemorySaver` Checkpointer mechanisms to ensure context continuity and fault recovery for long-running tasks.
-- **Chaos Engineering & Resilience**: Includes a basic chaos testing skeleton to verify graceful degradation under abnormal inputs or tool failures.
+- **True Human-in-the-Loop (HITL)**: Implements LangGraph's dynamic `interrupt()` API. High-risk operations (e.g., `restart_pod`, `apply_yaml_manifest`) pause the graph and require SRE approval via the frontend before execution.
+- **Model Context Protocol (MCP)**: Decouples tool execution from the core agent logic. A standalone K8s MCP Server is spawned via `stdio`, exposing standard tools for real cluster interaction.
+- **Real Kubernetes Integration**: Connects to Minikube/kind or production clusters using the official `kubernetes` Python SDK. Supports log retrieval, event diagnosis, and raw `kubectl` commands.
+- **Real-time Streaming (SSE)**: Streams LLM thought processes and tool execution statuses directly to the Streamlit frontend.
+- **Event-Driven AIOps (Webhook)**: Exposes a dedicated endpoint to ingest Prometheus Alertmanager webhooks for autonomous first-round triage.
+- **Cross-Platform & Enterprise Standards**: Enforces ASCII-only English logging (`[INFO]`, `[ERROR]`, `[WARN]`) for compatibility with RHEL9 and CI/CD log parsers.
 
-## 🧠 System Architecture
+## System Architecture
 
 ```mermaid
 graph TD
     %% User Interaction Layer
-    User([SRE / Developer]) -->|Report Incident / Alert| ChatUI[Chat UI / API Client]
+    User([SRE / Developer]) -->|Report Incident / Alert| ChatUI[Streamlit UI / API Client]
     
     %% Event Ingestion Layer
     Alert[Prometheus / Alerting System] -.->|Webhook Event| API
@@ -32,28 +34,26 @@ graph TD
     
     %% Agent Runtime (LangGraph)
     subgraph AgentRuntime["Agent Runtime (LangGraph)"]
-        Router{Intent Analysis & Router}
-        Planner[Agent Node<br>LLM Reasoning & Planning]
-        ToolExec[Tool Node<br>Tool Executor]
-        Checkpoint[(State & Memory<br>Checkpointer)]
-        HITL[HITL Approval Node<br>Interrupt / Resume]
+        Planner[Agent Node / LLM Planner]
+        Approval[HITL Approval Node]
+        ToolExec[Tool Node / Executor]
+        Checkpoint[(State & Memory / Checkpointer)]
         
-        API --> Router
-        Router -->|General Q&A| Planner
-        Router -->|Troubleshooting| Planner
+        API --> Planner
         Planner <--> Checkpoint
-        Planner -->|Tool Call| ToolExec
+        Planner -->|Tool Call| Approval
+        Approval -->|High-risk Action Request| SRE_Approve{Wait for SRE}
+        SRE_Approve -->|Approved| ToolExec
+        SRE_Approve -->|Rejected| Planner
+        Approval -->|Low-risk Action| ToolExec
         ToolExec -->|Execution Result| Planner
-        Planner -->|High-risk Action Request| HITL
-        HITL -->|SRE Approves| ToolExec
-        HITL -->|SRE Rejects| Planner
     end
     
     %% Underlying Tools & Systems
-    subgraph ExternalSystems["Internal Systems / MCP Tools"]
-        ToolExec -.->|API Call| K8s[(Kubernetes API)]
+    subgraph ExternalSystems["MCP Server / Internal Systems"]
+        ToolExec -.->|stdio JSON-RPC| MCPServer[MCP Server]
+        MCPServer -.->|Python SDK| K8s[(Kubernetes API)]
         ToolExec -.->|API Call| Monitor[(Prometheus / Monitoring)]
-        ToolExec -.->|MCP Protocol| CMDB[(CMDB / Internal Platforms)]
     end
     
     %% Styling
@@ -63,12 +63,12 @@ graph TD
     classDef hitl fill:#fff3cd,stroke:#ffc107,stroke-width:2px;
     
     class API api;
-    class Planner,ToolExec,Router core;
-    class K8s,Monitor,CMDB infra;
-    class HITL hitl;
+    class Planner,ToolExec core;
+    class K8s,Monitor,MCPServer infra;
+    class Approval,SRE_Approve hitl;
 ```
 
-## 🛠️ Getting Started
+## Getting Started
 
 ### 1. Clone the Repository
 ```bash
@@ -82,17 +82,12 @@ This project supports both `Conda` and `venv`. **Windows users are highly recomm
 <details>
 <summary><b>Option 1: Using Conda (Recommended for Windows)</b></summary>
 
-Due to network conditions in China, if you encounter a `pkgs/pro` 404 error, please copy the `.condarc.example` from the project root to `C:\Users\<YourUsername>\.condarc`, clear the cache, and then run:
+If you encounter a `pkgs/pro` 404 error, copy the `.condarc.example` from the project root to `C:\Users\<YourUsername>\.condarc`, clear the cache, and run:
 
 ```bash
-# 1. Clear cache and create a Python 3.11 environment
 conda clean -i -y
 conda create -n sre-meta-agent python=3.11 -y
-
-# 2. Activate the environment
 conda activate sre-meta-agent
-
-# 3. Install dependencies
 pip install -r requirements.txt
 ```
 </details>
@@ -102,69 +97,90 @@ pip install -r requirements.txt
 
 ```bash
 python -m venv .venv
-
-# Windows activation: .venv\Scripts\activate
-# Mac/Linux activation: source .venv/bin/activate
+# Windows: .venv\Scripts\activate
+# Mac/Linux: source .venv/bin/activate
 source .venv/bin/activate
-
 pip install -r requirements.txt
 ```
 </details>
 
 ### 3. Configuration
-Copy the example environment file and fill in your LLM API Key:
+Copy the example environment file and fill in your configuration:
+
 ```bash
 cp .env.example .env
 ```
+
 Edit the `.env` file:
 ```env
-# Any model compatible with the OpenAI interface works (e.g., DeepSeek, Qwen)
-OPENAI_API_KEY=sk-your-real-api-key
-OPENAI_API_BASE=https://api.openai.com/v1
+# LLM Configuration (Options: openai, ollama, deepseek)
+LLM_PROVIDER=ollama
+LLM_MODEL_NAME=qwen2.5:7b
+OLLAMA_BASE_URL=http://localhost:11434
+
+# Backend Configuration
+BACKEND_API_URL=http://127.0.0.1:8000
+
+# Kubernetes Configuration
+# Absolute path to your kubeconfig file (e.g., C:/Users/KUN/.kube/config)
+KUBECONFIG_PATH=~/.kube/config
 ```
 
+*Note: Ensure `kubectl` is installed and configured in your environment, as the MCP Server relies on the Kubernetes Python SDK which reads the same configuration.*
+
 ### 4. Running the Service
+
+You can run the application locally or via Docker Compose. 
+
+**Local Development:**
 ```bash
+# Terminal 1: Start FastAPI Backend
 uvicorn main:app --reload
+
+# Terminal 2: Start Streamlit Frontend
+streamlit run frontend/app.py
 ```
-Once the service is up, visit the Swagger UI for testing: **http://127.0.0.1:8000/docs**
+
+**Docker Compose:**
+```bash
+docker-compose up -d --build
+```
+*Access the UI at `http://localhost:8501` and the API at `http://localhost:8000`.*
 
 ---
 
-## 🧪 Testing Scenarios
+## Testing Scenarios
 
-Because the primary endpoint uses **Server-Sent Events (SSE)**, standard Swagger UI may not render the stream correctly. Use the `curl` commands below to test the platform.
+### Scenario 1: High-Risk Operation with HITL (UI)
+1. Open the Streamlit UI at `http://localhost:8501`.
+2. Enter the prompt: *"The pod crash-pod is not working. Please check the logs and restart it."*
+3. **Expected Behavior**:
+   - The Agent calls `get_pod_logs` (low risk) and gets real K8s logs.
+   - The Agent attempts to call `restart_pod` (high risk).
+   - The graph pauses. The UI displays an approval card: `[APPROVE] Execute` / `[REJECT] Cancel`.
+   - Click **Approve** to resume the graph and trigger the actual K8s deletion/recreation.
 
-### Scenario 1: Interactive Troubleshooting (Chat Stream)
-Open your terminal and run:
+### Scenario 2: Interactive Troubleshooting (API / SSE)
+Because the primary endpoint uses Server-Sent Events (SSE), standard Swagger UI may not render correctly. Use `curl`:
 
 ```bash
 curl -N -X POST "http://127.0.0.1:8000/api/v1/chat/stream" \
 -H "Content-Type: application/json" \
 -d '{
-  "message": "The pod payment-service-error is crashing. Please check the logs.",
-  "session_id": "sre-troubleshoot-001"
+  "message": "List all failed pods in the default namespace.",
+  "session_id": "sre-test-001"
 }'
 ```
 
-#### What you should see:
-Because local models are slower, you will see the stream pause for a few seconds, and then output:
-
+**Expected Output**:
 ```text
-data: {"type": "status", "content": "Executing tool: get_pod_logs..."}
-data: {"type": "token", "content": "Based on "}
-data: {"type": "token", "content": "the logs, "}
-...
-data: {"type": "token", "content": "the container is OOMKilled."}
+data: {"type": "status", "content": "[TOOL] Executing: list_failed_pods..."}
+data: {"type": "token", "content": "The following pods are failing: "}
+data: {"type": "token", "content": "crash-pod (Pending). "}
 data: [DONE]
 ```
 
-**Expected Agent Behavior**:
-1. You will see real-time SSE events (`data: {"type": "status"}`) indicating the Agent is executing the `get_pod_logs` tool.
-2. The tool returns mock `OOMKilled` error logs.
-3. You will see the LLM stream its final analysis (`data: {"type": "token"}`) with remediation advice (e.g., adjusting JVM memory).
-
-### Scenario 2: Automated AIOps (Prometheus Webhook)
+### Scenario 3: Automated AIOps (Prometheus Webhook)
 Simulate an alert firing from Prometheus Alertmanager:
 
 ```bash
@@ -175,54 +191,57 @@ curl -X POST "http://127.0.0.1:8000/api/v1/webhook/prometheus" \
   "alerts": [
     {
       "fingerprint": "local-123",
-      "annotations": {"summary": "Pod payment-service-oom OOMKilled."}
+      "annotations": {"summary": "Pod crash-pod OOMKilled."}
     }
   ]
 }'
 ```
-*Note: The endpoint will immediately return `200 OK`. The Agent will analyze the incident asynchronously via FastAPI BackgroundTasks.*
+*The endpoint returns `200 OK` immediately, and the Agent analyzes the incident asynchronously via FastAPI BackgroundTasks.*
 
 ---
 
-## 🗂️ Project Structure
+## Project Structure
 
 ```text
 sre-meta-agent/
 ├── .env.example
+├── docker-compose.yml
 ├── requirements.txt
-├── main.py                     # FastAPI Entry Point
+├── main.py                     # FastAPI Entry Point (Lifespan MCP Loader)
+├── frontend/
+│   └── app.py                  # Streamlit UI (Chat & HITL Approval)
+├── mcp_servers/
+│   └── k8s_server.py           # Standalone MCP v2 Server for K8s operations
 ├── app/
 │   ├── api/                    # API Routing Layer
-│   │   ├── chat.py             # SSE Streaming endpoints
-│   │   └── webhook.py          # Prometheus Alertmanager Webhook ingestion
+│   │   ├── chat.py             # SSE Streaming & Approval endpoints
+│   │   └── webhook.py          # Prometheus Alertmanager Webhook
 │   ├── core/                   # Agent Runtime & LangGraph
-│   │   ├── graph.py            # Graph compilation (Router, Planner, ToolExec)
-│   │   ├── state.py            # AgentState definition
-│   │   └── memory.py           # Checkpointer (MemorySaver setup)
+│   │   ├── graph.py            # Graph compilation (Planner, Approval, ToolExec)
+│   │   └── state.py            # AgentState definition
 │   ├── services/               # Business Logic
-│   │   ├── llm.py              # LLM initialization & Tool binding
+│   │   ├── llm.py              # LLM Factory (OpenAI, Ollama, etc.)
 │   │   └── prompts.py          # SRE System Prompts
-│   ├── tools/                  # Tool Layer
-│   │   └── k8s_tools.py        # K8s get_logs, restart_pod
 │   └── schemas/                # Pydantic Models
-│       └── payloads.py         # ChatRequest, WebhookPayload
+│       └── payloads.py         
 ├── tests/                      # Unit & Resilience Tests
-│   ├── test_graph.py
-│   └── chaos/
-└── deploy/
-    └── Dockerfile
+└── deploy/                     # Dockerfiles for Backend & Frontend
 ```
 
-## 🧪 Running Unit Tests
+## Running Unit Tests
 
 ```bash
 pytest tests/ -v
 ```
 
-## 🗺️ Roadmap
+## Roadmap
 
-This is an Enterprise MVP. Future evolutions toward a fully production-ready platform include:
-- [ ] **Persistent Storage**: Upgrade `MemorySaver` to `PostgresSaver` or `RedisSaver` to support distributed state sharing across multiple instances.
-- [ ] **Human-in-the-Loop (HITL)**: Implement LangGraph's `interrupt_before=["tools"]` to pause execution before high-risk operations (like `restart_pod`) and wait for API-based approval.
-- [ ] **MCP Protocol Integration**: Introduce the Model Context Protocol for dynamic discovery and integration of external enterprise tools.
-- [ ] **Observability**: Integrate OpenTelemetry or LangSmith to monitor token consumption and inference latency.
+Completed in v0.2.0:
+- [x] **Human-in-the-Loop (HITL)**: Implemented LangGraph `interrupt()` for high-risk operations.
+- [x] **MCP Protocol Integration**: Migrated tools to a standalone MCP Server (`stdio`).
+- [x] **Real K8s Cluster**: Integrated official `kubernetes` SDK for actual cluster mutations and queries.
+
+Future evolutions toward a fully production-ready platform:
+- [ ] **Persistent Storage**: Upgrade `MemorySaver` to `PostgresSaver` for distributed state sharing.
+- [ ] **Observability**: Integrate OpenTelemetry or LangSmith to monitor token consumption and graph execution traces.
+- [ ] **CI/CD Pipeline**: Add GitHub Actions for automated testing and multi-arch Docker builds.

@@ -1,0 +1,65 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ "main", "release", "develop" ]
+  pull_request:
+    branches: [ "main", "release", "develop" ]
+name: CI Pipeline
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run Pytest suite
+      run: |
+        python -m pytest tests/ -v
+      env:
+        # 1. Secrets (Sensitive Data)
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        
+        # 2. GitHub Variables (Non-sensitive Configuration)
+        # Uses the GitHub variable if set, otherwise falls back to the default value
+        LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'anthropic' }}
+        LLM_MODEL_NAME: ${{ vars.LLM_MODEL_NAME || 'claude-3-haiku-20240307' }}
+        
+        # 3. Static CI Configurations
+        LANGCHAIN_TRACING_V2: "false"
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build Backend Docker Image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./deploy/Dockerfile.backend
+        push: false
+        tags: sre-meta-agent-backend:ci-test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Build Frontend Docker Image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./deploy/Dockerfile.frontend
+        push: false
+        tags: sre-meta-agent-frontend:ci-test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max

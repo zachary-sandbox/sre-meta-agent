@@ -34,7 +34,13 @@ def get_llm(provider: str = None, model_name: str = None, **kwargs):
         
     elif provider == "ollama":
         # Ollama runs locally, no API key needed, but base_url might be required
-        return ChatOllama(model=model_name, **kwargs)
+        return ChatOllama(
+        model=model_name,
+        temperature=kwargs.get("temperature"),
+        num_ctx=8192,
+        timeout=120.0,
+        max_retries=2
+    )
         
     else:
         raise ValueError(f"[ERROR] Unsupported LLM Provider: {provider}. "
