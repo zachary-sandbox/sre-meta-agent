@@ -12,7 +12,11 @@ def test_factory_returns_ollama():
     assert isinstance(llm, ChatOllama)
     assert llm.model == "qwen2.5:7b"
 
-@patch.dict(os.environ, {"LLM_PROVIDER": "openai", "LLM_MODEL_NAME": "gpt-4-turbo"})
+@patch.dict(os.environ, {
+    "LLM_PROVIDER": "openai", 
+    "LLM_MODEL_NAME": "gpt-4-turbo",
+    "OPENAI_API_KEY": "sk-dummy-key-for-testing" # [FIX] 注入假 Key
+})
 def test_factory_returns_openai():
     """Test if factory returns ChatOpenAI when env is set to openai."""
     llm = get_llm()

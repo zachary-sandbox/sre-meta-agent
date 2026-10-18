@@ -37,24 +37,38 @@ async def test_llm_timeout_resilience(mocker):
 @pytest.mark.asyncio
 async def test_mcp_tool_disconnect(mocker):
     """Simulate MCP Server disconnect during tool execution."""
+    
+    # 1. Setup Mock Tool that raises an exception
     mock_tool = mocker.Mock()
     mock_tool.name = "mock_tool"
     mock_tool.ainvoke = AsyncMock(side_effect=ConnectionError("MCP Server Disconnected"))
 
+    # 2. Setup Mock LLM with side_effect (First call: Tool Call, Second call: Final Answer)
     mock_llm = mocker.Mock()
     mock_llm.bind_tools.return_value = mock_llm
-    # Force LLM to call the tool
-    mock_llm.ainvoke = AsyncMock(return_value=AIMessage(content="", tool_calls=[{"name": "mock_tool", "args": {}, "id": "call_1"}]))
+    
+    mock_llm.ainvoke = AsyncMock(side_effect=[
+        # First response: LLM decides to call the tool
+        AIMessage(content="", tool_calls=[{"name": "mock_tool", "args": {}, "id": "call_1"}]),
+        # Second response: LLM sees the error and generates a final text response (no tool_calls)
+        AIMessage(content="I tried to execute the tool, but the MCP server disconnected.")
+    ])
 
-    with patch("app.core.graph.llm", mock_llm):
-        graph = build_graph([mock_tool])
-        inputs = {"messages": [HumanMessage(content="Test disconnect")]}
-        config = {"configurable": {"thread_id": "chaos-2"}}
-        
-        result = await graph.ainvoke(inputs, config=config)
-        
-        # The graph should catch the tool error and pass it to the LLM as a ToolMessage
-        # Then the LLM outputs a final AIMessage
-        tool_messages = [m for m in result["messages"] if m.type == "tool"]
-        assert len(tool_messages) > 0
-        assert "Tool execution error: MCP Server Disconnected" in tool_messages[0].content
+    # 3. Patch the LLM and build the graph
+    mocker.patch("app.core.graph.llm", mock_llm)
+    graph = build_graph([mock_tool])
+    
+    # 4. Run the graph
+    inputs = {"messages": [HumanMessage(content="Test disconnect")]}
+    config = {"configurable": {"thread_id": "chaos-2"}}
+    
+    result = await graph.ainvoke(inputs, config=config)
+    
+    # 5. Assertions
+    # Check if the error message was captured in a ToolMessage
+    tool_messages = [m for m in result["messages"] if m.type == "tool"]
+    assert len(tool_messages) > 0
+    assert "Tool execution error: MCP Server Disconnected" in tool_messages[0].content
+    
+    # Check if the Agent successfully exited the loop with a final response
+    assert "MCP server disconnected" in result["messages"][-1].content
