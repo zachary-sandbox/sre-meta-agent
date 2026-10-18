@@ -133,10 +133,20 @@ def run_kubectl_command(command: str) -> str:
     try:
         _load_k8s_config() 
         
+        # FIX: Inherit the full environment and explicitly set KUBECONFIG
+        env = os.environ.copy()
+        env["KUBECONFIG"] = str(Path(KUBECONFIG_PATH).resolve())
+        
         # Split the string command into a list, e.g., "get pods" -> ["get", "pods"]
         cmd_args = ["kubectl"] + command.split()
         
-        result = subprocess.run(cmd_args, capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            cmd_args, 
+            capture_output=True, 
+            text=True, 
+            check=True,
+            env=env  # Pass the environment variables
+        )
         return result.stdout if result.stdout else "Command executed successfully (no output)."
     except subprocess.CalledProcessError as e:
         return f"kubectl command failed:\n{e.stderr}"
@@ -153,13 +163,18 @@ def apply_yaml_manifest(yaml_content: str) -> str:
     try:
         _load_k8s_config()
         
+        # FIX: Inherit the full environment and explicitly set KUBECONFIG
+        env = os.environ.copy()
+        env["KUBECONFIG"] = str(Path(KUBECONFIG_PATH).resolve())
+        
         # Pass the YAML content to kubectl apply via stdin
         process = subprocess.run(
             ["kubectl", "apply", "-f", "-"],
             input=yaml_content,
             capture_output=True,
             text=True,
-            check=True
+            check=True,
+            env=env  # Pass the environment variables
         )
         return process.stdout
     except subprocess.CalledProcessError as e:

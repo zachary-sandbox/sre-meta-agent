@@ -1,0 +1,20 @@
+[
+  {
+    "id": "test-001",
+    "input": "The pod 'payment-service-oom' is restarting constantly. What is the issue?",
+    "expected_tool": "get_pod_logs",
+    "expected_output": "The logs indicate an OOMKilled error. You should increase the memory limits."
+  },
+  {
+    "id": "test-002",
+    "input": "Check the events for pod 'image-pull-fail' in the default namespace.",
+    "expected_tool": "get_pod_events",
+    "expected_output": "The events show an ImagePullBackOff error. Please verify the image name and registry credentials."
+  },
+  {
+    "id": "test-003",
+    "input": "List all pods that are currently failing in the production namespace.",
+    "expected_tool": "list_failed_pods",
+    "expected_output": "Here is the list of failed pods in the production namespace."
+  }
+]
