@@ -4,18 +4,21 @@ from main import app
 
 @pytest.fixture
 def client(mocker):
-    # [FIX] 给 app.state 注入一个 Mock Graph，防止未执行 lifespan 导致 AttributeError/KeyError
+    # [FIX] Inject a Mock Graph into app.state to prevent AttributeError/KeyError
+    # since the FastAPI lifespan is not triggered during unit tests.
     mock_graph = mocker.MagicMock()
     app.state.agent_graph = mock_graph
     return TestClient(app)
 
 def test_health_check(client):
+    """Verify the health check endpoint returns 200 OK."""
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "healthy"}
 
 def test_prometheus_webhook(client, mocker):
-    # [FIX] 必须使用 new_callable=mocker.AsyncMock，因为 process_alert 是 async 函数
+    """Verify the webhook endpoint accepts the payload and returns accepted status."""
+    # [FIX] Use new_callable=mocker.AsyncMock because process_alert is an async function.
     mocker.patch("app.api.webhook.process_alert", new_callable=mocker.AsyncMock)
     
     payload = {
@@ -30,6 +33,6 @@ def test_prometheus_webhook(client, mocker):
     
     response = client.post("/api/v1/webhook/prometheus", json=payload)
     
-    # 验证 API 正常接收并返回
+    # Verify the API successfully receives the request and returns 200
     assert response.status_code == 200
     assert response.json()["status"] == "accepted"
