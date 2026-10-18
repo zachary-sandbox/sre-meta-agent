@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.backend
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434 # Connect to host's Ollama
+      # Mount Kubeconfig (Windows users: replace with your host absolute path)
+      # - KUBECONFIG_PATH=/root/.kube/config
+    # volumes:
+    #   - C:/Users/KUN/.kube/config:/root/.kube/config
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.frontend
+    ports:
+      - "8501:8501"
+    environment:
+      # IMPORTANT: Use 'backend', not '127.0.0.1', because they are in the Docker network
+      - BACKEND_API_URL=http://backend:8000
+    depends_on:
+      - backend

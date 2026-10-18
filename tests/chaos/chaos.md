@@ -3,6 +3,7 @@
 ```bash
 # Create an OOM pod
 kubectl run oom-pod --image=busybox --limits=memory=10Mi --restart=Never -- sh -c "sleep 3600"
+kubectl run payment-service-oom --image=busybox --restart=Never -- sh -c "sleep 3600"
 # Or deploy a crashing pod
 kubectl run crash-pod --image=busybox --limits=memory=10Mi 
 
