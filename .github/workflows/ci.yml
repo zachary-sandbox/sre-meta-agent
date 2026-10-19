@@ -2,9 +2,11 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ "main", "release/*", "deploy/*" ]
+    # Only trigger on push to stable branches and tags
+    branches: [ "main", "release/*" ]
     tags: [ "v*" ]
   pull_request:
+    # Trigger PR checks on all target branches
     branches: [ "main", "release/*", "deploy/*" ]
   workflow_dispatch:
 
