@@ -2,13 +2,14 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ "main", "release/*", "deploy/*" ]
-    tags: [ "v*" ] # Trigger on version tags like v0.3.0
+    # Only trigger on push to stable branches and tags
+    branches: [ "main", "release/*" ]
+    tags: [ "v*" ]
   pull_request:
+    # Trigger PR checks on all target branches
     branches: [ "main", "release/*", "deploy/*" ]
   workflow_dispatch:
 
-# Concurrency control to cancel redundant/duplicate runs
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -16,12 +17,8 @@ concurrency:
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
-    
-    # IMPORTANT: Reference the environment where your secrets are stored
     environment: sre-meta-agent
     
-    # Define global variables for the job. 
-    # The fallback 'dummyuser' prevents invalid Docker tags if the secret is missing.
     env:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME || 'dummyuser' }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -67,10 +64,13 @@ jobs:
       with:
         images: ${{ env.DOCKERHUB_USERNAME }}/sre-meta-agent-backend
         tags: |
-          type=ref,event=branch
+          # Generate semver tags (e.g., v0.3.0, 0.3)
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
+          # Generate latest tag only for the default branch (main)
           type=raw,value=latest,enable={{is_default_branch}}
+          # Generate short commit hash tag for exact tracing
+          type=sha,format=short
 
     - name: Extract Metadata for Frontend
       id: meta-frontend
@@ -78,17 +78,18 @@ jobs:
       with:
         images: ${{ env.DOCKERHUB_USERNAME }}/sre-meta-agent-frontend
         tags: |
-          type=ref,event=branch
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
           type=raw,value=latest,enable={{is_default_branch}}
+          type=sha,format=short
 
     # ==========================================
     # Stage 2: Login to Docker Hub
     # ==========================================
-    # Only login on non-PR events (push to main, push tags, etc.)
+    # ONLY login on main branch pushes or version tags.
+    # Deploy branches and PRs will NOT trigger login.
     - name: Log in to Docker Hub
-      if: github.event_name != 'pull_request'
+      if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
       uses: docker/login-action@v3
       with:
         username: ${{ env.DOCKERHUB_USERNAME }}
@@ -102,8 +103,8 @@ jobs:
       with:
         context: .
         file: ./deploy/Dockerfile.backend
-        # Only push if NOT a pull request (i.e., main branch or tags)
-        push: ${{ github.event_name != 'pull_request' }}
+        # ONLY push on main branch or tags
+        push: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
         tags: ${{ steps.meta-backend.outputs.tags }}
         labels: ${{ steps.meta-backend.outputs.labels }}
         cache-from: type=gha
@@ -114,7 +115,8 @@ jobs:
       with:
         context: .
         file: ./deploy/Dockerfile.frontend
-        push: ${{ github.event_name != 'pull_request' }}
+        # ONLY push on main branch or tags
+        push: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
         tags: ${{ steps.meta-frontend.outputs.tags }}
         labels: ${{ steps.meta-frontend.outputs.labels }}
         cache-from: type=gha
